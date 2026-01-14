@@ -1,9 +1,4 @@
-if (NOT GGML_METAL)
-    message(STATUS "ggml-metal-microbench: disabled because GGML_METAL=OFF")
-    return()
-endif()
-
-set(TARGET ggml-metal-microbench)
+set(TARGET ggml-microbench)
 
 include(FetchContent)
 set(BENCHMARK_ENABLE_WERROR OFF CACHE BOOL "" FORCE)
@@ -19,7 +14,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googlebenchmark)
 
 add_executable(${TARGET}
-    ggml-metal-microbench.cpp
+    ggml-microbench.cpp
 )
 
 target_link_libraries(${TARGET} PRIVATE

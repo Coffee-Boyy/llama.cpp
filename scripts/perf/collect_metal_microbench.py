@@ -126,14 +126,14 @@ def format_change(delta):
 
 def main():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    default_bin = os.path.join(repo_root, "build", "bin", "ggml-metal-microbench")
-    default_log = os.path.join(repo_root, "docs", "perf", "metal-microbench.jsonl")
+    default_bin = os.path.join(repo_root, "build", "bin", "ggml-microbench")
+    default_log = os.path.join(repo_root, "docs", "perf", "microbench.jsonl")
     default_runs = os.path.join(repo_root, "docs", "perf", "runs")
 
     parser = argparse.ArgumentParser(
-        description="Collect ggml metal microbench results and append to a JSONL log."
+        description="Collect ggml microbench results and append to a JSONL log."
     )
-    parser.add_argument("--bin", default=default_bin, help="Path to ggml-metal-microbench binary.")
+    parser.add_argument("--bin", default=default_bin, help="Path to ggml-microbench binary.")
     parser.add_argument("--log", default=default_log, help="JSONL log file to append.")
     parser.add_argument("--runs-dir", default=default_runs, help="Directory for raw JSON outputs.")
     parser.add_argument("--label", default="", help="Short label for the run (change description).")

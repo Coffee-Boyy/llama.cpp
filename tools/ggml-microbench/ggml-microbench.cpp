@@ -61,7 +61,7 @@ struct ggml_context_deleter {
     }
 };
 
-std::string g_backend_name = "Metal";
+std::string g_backend_name = "CPU";
 
 struct BackendHolder {
     ggml_backend_t backend = nullptr;
@@ -70,7 +70,7 @@ struct BackendHolder {
         ggml_backend_load_all();
         backend = ggml_backend_init_by_name(g_backend_name.c_str(), nullptr);
         if (!backend) {
-            std::fprintf(stderr, "ggml-metal-microbench: failed to init backend '%s'\n", g_backend_name.c_str());
+            std::fprintf(stderr, "ggml-microbench: failed to init backend '%s'\n", g_backend_name.c_str());
             std::abort();
         }
     }

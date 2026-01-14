@@ -8,7 +8,7 @@ Microbenchmarks for Metal inference hot paths using Google Benchmark.
 cmake -S . -B build \
   -DGGML_METAL=ON \
   -DLLAMA_BUILD_TOOLS=ON \
-  -DLLAMA_BUILD_METAL_MICROBENCH=ON
+  -DLLAMA_BUILD_MICROBENCH=ON
 cmake --build build --config Release
 ```
 

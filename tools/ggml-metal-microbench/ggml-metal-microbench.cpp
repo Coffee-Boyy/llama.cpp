@@ -2,8 +2,6 @@
 
 #include "ggml.h"
 #include "ggml-backend.h"
-#include "ggml-metal.h"
-
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -43,6 +41,14 @@ int parse_flag_int(const std::string & value, int fallback) {
     return fallback;
 }
 
+bool parse_flag_string(const std::string & value, std::string & out) {
+    if (!value.empty()) {
+        out = value;
+        return true;
+    }
+    return false;
+}
+
 
 constexpr int kGraphNodes = 256;
 constexpr size_t kTensorOverheadCount = 128;
@@ -55,27 +61,29 @@ struct ggml_context_deleter {
     }
 };
 
-struct MetalBackendHolder {
+std::string g_backend_name = "Metal";
+
+struct BackendHolder {
     ggml_backend_t backend = nullptr;
 
-    MetalBackendHolder() {
+    BackendHolder() {
         ggml_backend_load_all();
-        backend = ggml_backend_init_by_name("Metal", nullptr);
+        backend = ggml_backend_init_by_name(g_backend_name.c_str(), nullptr);
         if (!backend) {
-            std::fprintf(stderr, "ggml-metal-microbench: failed to init Metal backend\n");
+            std::fprintf(stderr, "ggml-metal-microbench: failed to init backend '%s'\n", g_backend_name.c_str());
             std::abort();
         }
     }
 
-    ~MetalBackendHolder() {
+    ~BackendHolder() {
         if (backend) {
             ggml_backend_free(backend);
         }
     }
 };
 
-ggml_backend_t get_metal_backend() {
-    static MetalBackendHolder holder;
+ggml_backend_t get_backend() {
+    static BackendHolder holder;
     return holder.backend;
 }
 
@@ -164,10 +172,10 @@ struct BenchGraph {
 };
 
 void run_benchmark(benchmark::State & state, BenchGraph & bench) {
-    ggml_backend_t backend = get_metal_backend();
+    ggml_backend_t backend = get_backend();
 
     if (!ggml_backend_supports_op(backend, bench.out)) {
-        state.SkipWithError("Metal backend does not support op");
+        state.SkipWithError("backend does not support op");
         return;
     }
 
@@ -196,7 +204,7 @@ BenchGraph build_mul_mat_f16(int64_t m, int64_t k, int64_t n) {
     ggml_tensor * x = ggml_new_tensor_2d(bench.ctx.get(), GGML_TYPE_F16, k, n);
     bench.out = ggml_mul_mat(bench.ctx.get(), w, x);
 
-    bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_metal_backend());
+    bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_backend());
     fill_tensor_pattern(w);
     fill_tensor_pattern(x);
 
@@ -213,7 +221,7 @@ BenchGraph build_mul_mat_q4_0(int64_t m, int64_t k, int64_t n) {
     ggml_tensor * x = ggml_new_tensor_2d(bench.ctx.get(), GGML_TYPE_F32, k, n);
     bench.out = ggml_mul_mat(bench.ctx.get(), w, x);
 
-    bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_metal_backend());
+    bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_backend());
     fill_tensor_pattern(w);
     fill_tensor_pattern(x);
 
@@ -229,7 +237,7 @@ BenchGraph build_rms_norm(int64_t n_embd) {
     ggml_tensor * x = ggml_new_tensor_2d(bench.ctx.get(), GGML_TYPE_F32, n_embd, 1);
     bench.out = ggml_rms_norm(bench.ctx.get(), x, 1e-5f);
 
-    bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_metal_backend());
+    bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_backend());
     fill_tensor_pattern(x);
 
     bench.graph = ggml_new_graph_custom(bench.ctx.get(), kGraphNodes, false);
@@ -248,7 +256,7 @@ BenchGraph build_rope(int64_t n_dims, int64_t n_heads, int64_t n_tokens) {
         static_cast<int>(n_dims), GGML_ROPE_TYPE_NEOX, static_cast<int>(n_tokens),
         10000.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f);
 
-    bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_metal_backend());
+    bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_backend());
     fill_tensor_pattern(x);
     fill_tensor_pattern(pos);
 
@@ -264,7 +272,7 @@ BenchGraph build_softmax(int64_t n_kv, int64_t n_heads) {
     ggml_tensor * x = ggml_new_tensor_2d(bench.ctx.get(), GGML_TYPE_F32, n_kv, n_heads);
     bench.out = ggml_soft_max(bench.ctx.get(), x);
 
-    bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_metal_backend());
+    bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_backend());
     fill_tensor_pattern(x);
 
     bench.graph = ggml_new_graph_custom(bench.ctx.get(), kGraphNodes, false);
@@ -284,7 +292,7 @@ BenchGraph build_flash_attn(int64_t head_dim, int64_t n_heads, int64_t n_heads_k
     bench.out = ggml_flash_attn_ext(bench.ctx.get(), q, k, v, mask, 1.0f / std::sqrt(static_cast<float>(head_dim)), 0.0f, 0.0f);
     ggml_flash_attn_ext_set_prec(bench.out, GGML_PREC_DEFAULT);
 
-    bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_metal_backend());
+    bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_backend());
     fill_tensor_pattern(q);
     fill_tensor_pattern(k);
     fill_tensor_pattern(v);
@@ -385,6 +393,7 @@ BENCHMARK(BM_FlashAttn)->Apply(apply_flash_attn_args);
 int main(int argc, char ** argv) {
     int ggml_repetitions = -1;
     bool ggml_aggregates_only = false;
+    std::string ggml_backend = g_backend_name;
 
     std::vector<std::string> args;
     args.reserve(static_cast<size_t>(argc));
@@ -400,6 +409,18 @@ int main(int argc, char ** argv) {
         }
         if (arg == "--ggml_report_aggregates_only") {
             ggml_aggregates_only = true;
+            continue;
+        }
+        if (has_prefix(arg, "--ggml_backend=")) {
+            if (parse_flag_string(arg.substr(std::string("--ggml_backend=").size()), ggml_backend)) {
+                g_backend_name = ggml_backend;
+            }
+            continue;
+        }
+        if (arg == "--ggml_backend" && i + 1 < argc) {
+            if (parse_flag_string(argv[++i], ggml_backend)) {
+                g_backend_name = ggml_backend;
+            }
             continue;
         }
         args.emplace_back(std::move(arg));
@@ -431,6 +452,7 @@ int main(int argc, char ** argv) {
     if (ggml_aggregates_only) {
         benchmark::AddCustomContext("ggml_report_aggregates_only", "true");
     }
+    benchmark::AddCustomContext("ggml_backend", g_backend_name);
 
     benchmark::RunSpecifiedBenchmarks();
     benchmark::Shutdown();

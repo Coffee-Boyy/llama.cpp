@@ -8,10 +8,41 @@
 #include <cstdint>
 #include <cstdio>
 #include <memory>
-#include <random>
+#include <algorithm>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
+bool has_prefix(const std::string_view value, const std::string_view prefix) {
+    return value.size() >= prefix.size() && value.substr(0, prefix.size()) == prefix;
+}
+
+bool has_flag(const std::vector<std::string> & args, const std::string_view flag) {
+    for (size_t i = 0; i < args.size(); ++i) {
+        const std::string & arg = args[i];
+        if (arg == flag) {
+            return true;
+        }
+        if (has_prefix(arg, flag) && arg.size() > flag.size() && arg[flag.size()] == '=') {
+            return true;
+        }
+    }
+    return false;
+}
+
+int parse_flag_int(const std::string & value, int fallback) {
+    try {
+        size_t offset = 0;
+        int parsed = std::stoi(value, &offset, 10);
+        if (offset == value.size()) {
+            return parsed;
+        }
+    } catch (const std::exception &) {
+    }
+    return fallback;
+}
+
 
 constexpr int kGraphNodes = 256;
 constexpr size_t kTensorOverheadCount = 128;
@@ -57,23 +88,20 @@ std::unique_ptr<ggml_context, ggml_context_deleter> make_context(size_t tensor_c
     return std::unique_ptr<ggml_context, ggml_context_deleter>(ggml_init(params));
 }
 
-void fill_tensor_random(ggml_tensor * t) {
-    static std::mt19937 rng(42);
-
+void fill_tensor_pattern(ggml_tensor * t) {
     switch (t->type) {
         case GGML_TYPE_F32: {
             std::vector<float> data(ggml_nelements(t));
-            std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
-            for (float & v : data) {
-                v = dist(rng);
+            for (size_t i = 0; i < data.size(); ++i) {
+                data[i] = static_cast<float>((i % 4096) / 2048.0f - 1.0f);
             }
             ggml_backend_tensor_set(t, data.data(), 0, data.size() * sizeof(float));
         } break;
         case GGML_TYPE_F16: {
             std::vector<ggml_fp16_t> data(ggml_nelements(t));
-            std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
-            for (ggml_fp16_t & v : data) {
-                v = ggml_fp32_to_fp16(dist(rng));
+            for (size_t i = 0; i < data.size(); ++i) {
+                float value = static_cast<float>((i % 4096) / 2048.0f - 1.0f);
+                data[i] = ggml_fp32_to_fp16(value);
             }
             ggml_backend_tensor_set(t, data.data(), 0, data.size() * sizeof(ggml_fp16_t));
         } break;
@@ -86,9 +114,8 @@ void fill_tensor_random(ggml_tensor * t) {
         } break;
         default: {
             std::vector<uint8_t> data(ggml_nbytes(t));
-            std::uniform_int_distribution<int> dist(0, 255);
-            for (uint8_t & v : data) {
-                v = static_cast<uint8_t>(dist(rng));
+            for (size_t i = 0; i < data.size(); ++i) {
+                data[i] = static_cast<uint8_t>(i & 0xff);
             }
             ggml_backend_tensor_set(t, data.data(), 0, data.size());
         } break;
@@ -170,8 +197,8 @@ BenchGraph build_mul_mat_f16(int64_t m, int64_t k, int64_t n) {
     bench.out = ggml_mul_mat(bench.ctx.get(), w, x);
 
     bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_metal_backend());
-    fill_tensor_random(w);
-    fill_tensor_random(x);
+    fill_tensor_pattern(w);
+    fill_tensor_pattern(x);
 
     bench.graph = ggml_new_graph_custom(bench.ctx.get(), kGraphNodes, false);
     ggml_build_forward_expand(bench.graph, bench.out);
@@ -187,8 +214,8 @@ BenchGraph build_mul_mat_q4_0(int64_t m, int64_t k, int64_t n) {
     bench.out = ggml_mul_mat(bench.ctx.get(), w, x);
 
     bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_metal_backend());
-    fill_tensor_random(w);
-    fill_tensor_random(x);
+    fill_tensor_pattern(w);
+    fill_tensor_pattern(x);
 
     bench.graph = ggml_new_graph_custom(bench.ctx.get(), kGraphNodes, false);
     ggml_build_forward_expand(bench.graph, bench.out);
@@ -203,7 +230,7 @@ BenchGraph build_rms_norm(int64_t n_embd) {
     bench.out = ggml_rms_norm(bench.ctx.get(), x, 1e-5f);
 
     bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_metal_backend());
-    fill_tensor_random(x);
+    fill_tensor_pattern(x);
 
     bench.graph = ggml_new_graph_custom(bench.ctx.get(), kGraphNodes, false);
     ggml_build_forward_expand(bench.graph, bench.out);
@@ -222,8 +249,8 @@ BenchGraph build_rope(int64_t n_dims, int64_t n_heads, int64_t n_tokens) {
         10000.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f);
 
     bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_metal_backend());
-    fill_tensor_random(x);
-    fill_tensor_random(pos);
+    fill_tensor_pattern(x);
+    fill_tensor_pattern(pos);
 
     bench.graph = ggml_new_graph_custom(bench.ctx.get(), kGraphNodes, false);
     ggml_build_forward_expand(bench.graph, bench.out);
@@ -238,7 +265,7 @@ BenchGraph build_softmax(int64_t n_kv, int64_t n_heads) {
     bench.out = ggml_soft_max(bench.ctx.get(), x);
 
     bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_metal_backend());
-    fill_tensor_random(x);
+    fill_tensor_pattern(x);
 
     bench.graph = ggml_new_graph_custom(bench.ctx.get(), kGraphNodes, false);
     ggml_build_forward_expand(bench.graph, bench.out);
@@ -258,56 +285,154 @@ BenchGraph build_flash_attn(int64_t head_dim, int64_t n_heads, int64_t n_heads_k
     ggml_flash_attn_ext_set_prec(bench.out, GGML_PREC_DEFAULT);
 
     bench.buffer = ggml_backend_alloc_ctx_tensors(bench.ctx.get(), get_metal_backend());
-    fill_tensor_random(q);
-    fill_tensor_random(k);
-    fill_tensor_random(v);
-    fill_tensor_random(mask);
+    fill_tensor_pattern(q);
+    fill_tensor_pattern(k);
+    fill_tensor_pattern(v);
+    fill_tensor_pattern(mask);
 
     bench.graph = ggml_new_graph_custom(bench.ctx.get(), kGraphNodes, false);
     ggml_build_forward_expand(bench.graph, bench.out);
     return bench;
 }
 
+void apply_mul_mat_args(benchmark::internal::Benchmark * benchmark) {
+    const std::vector<int64_t> sizes = { 1024, 2048, 4096 };
+    const std::vector<int64_t> batch = { 1, 4 };
+    for (int64_t m : sizes) {
+        for (int64_t k : sizes) {
+            for (int64_t n : batch) {
+                benchmark->Args({m, k, n});
+            }
+        }
+    }
+}
+
+void apply_rope_args(benchmark::internal::Benchmark * benchmark) {
+    const std::vector<int64_t> dims = { 64, 128, 256 };
+    const std::vector<int64_t> heads = { 8, 16, 32 };
+    const std::vector<int64_t> tokens = { 1, 16, 128 };
+    for (int64_t n_dims : dims) {
+        for (int64_t n_heads : heads) {
+            for (int64_t n_tokens : tokens) {
+                benchmark->Args({n_dims, n_heads, n_tokens});
+            }
+        }
+    }
+}
+
+void apply_flash_attn_args(benchmark::internal::Benchmark * benchmark) {
+    const std::vector<int64_t> head_dim = { 64, 128 };
+    const std::vector<int64_t> head_counts = { 8, 16, 32 };
+    const std::vector<int64_t> kv_tokens = { 64, 128 };
+    const std::vector<int64_t> batches = { 1, 4 };
+    for (int64_t dim : head_dim) {
+        for (int64_t n_heads : head_counts) {
+            for (int64_t n_heads_kv : { std::max<int64_t>(1, n_heads / 4), std::max<int64_t>(1, n_heads / 2) }) {
+                for (int64_t n_kv : kv_tokens) {
+                    for (int64_t n_batch : batches) {
+                        benchmark->Args({dim, n_heads, n_heads_kv, n_kv, n_batch});
+                    }
+                }
+            }
+        }
+    }
+}
+
 } // namespace
 
 static void BM_MulMatF16(benchmark::State & state) {
-    const int64_t m = 4096;
-    const int64_t k = 4096;
-    const int64_t n = 1;
+    const int64_t m = state.range(0);
+    const int64_t k = state.range(1);
+    const int64_t n = state.range(2);
     auto bench = build_mul_mat_f16(m, k, n);
     run_benchmark(state, bench);
 }
-BENCHMARK(BM_MulMatF16);
+BENCHMARK(BM_MulMatF16)->Apply(apply_mul_mat_args);
 
 static void BM_MulMatQ4_0(benchmark::State & state) {
-    const int64_t m = 4096;
-    const int64_t k = 4096;
-    const int64_t n = 1;
+    const int64_t m = state.range(0);
+    const int64_t k = state.range(1);
+    const int64_t n = state.range(2);
     auto bench = build_mul_mat_q4_0(m, k, n);
     run_benchmark(state, bench);
 }
-BENCHMARK(BM_MulMatQ4_0);
+BENCHMARK(BM_MulMatQ4_0)->Apply(apply_mul_mat_args);
 
 static void BM_RmsNorm(benchmark::State & state) {
-    auto bench = build_rms_norm(4096);
+    auto bench = build_rms_norm(state.range(0));
     run_benchmark(state, bench);
 }
-BENCHMARK(BM_RmsNorm);
+BENCHMARK(BM_RmsNorm)->RangeMultiplier(2)->Range(512, 8192);
 
 static void BM_Rope(benchmark::State & state) {
-    auto bench = build_rope(128, 32, 1);
+    auto bench = build_rope(state.range(0), state.range(1), state.range(2));
     run_benchmark(state, bench);
 }
-BENCHMARK(BM_Rope);
+BENCHMARK(BM_Rope)->Apply(apply_rope_args);
 
 static void BM_Softmax(benchmark::State & state) {
-    auto bench = build_softmax(128, 32);
+    auto bench = build_softmax(state.range(0), state.range(1));
     run_benchmark(state, bench);
 }
-BENCHMARK(BM_Softmax);
+BENCHMARK(BM_Softmax)->RangeMultiplier(2)->Ranges({{64, 1024}, {8, 32}});
 
 static void BM_FlashAttn(benchmark::State & state) {
-    auto bench = build_flash_attn(128, 32, 8, 128, 1);
+    auto bench = build_flash_attn(state.range(0), state.range(1), state.range(2), state.range(3), state.range(4));
     run_benchmark(state, bench);
 }
-BENCHMARK(BM_FlashAttn);
+BENCHMARK(BM_FlashAttn)->Apply(apply_flash_attn_args);
+
+int main(int argc, char ** argv) {
+    int ggml_repetitions = -1;
+    bool ggml_aggregates_only = false;
+
+    std::vector<std::string> args;
+    args.reserve(static_cast<size_t>(argc));
+    for (int i = 0; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (has_prefix(arg, "--ggml_repetitions=")) {
+            ggml_repetitions = parse_flag_int(arg.substr(std::string("--ggml_repetitions=").size()), ggml_repetitions);
+            continue;
+        }
+        if (arg == "--ggml_repetitions" && i + 1 < argc) {
+            ggml_repetitions = parse_flag_int(argv[++i], ggml_repetitions);
+            continue;
+        }
+        if (arg == "--ggml_report_aggregates_only") {
+            ggml_aggregates_only = true;
+            continue;
+        }
+        args.emplace_back(std::move(arg));
+    }
+
+    if (ggml_repetitions > 0 && !has_flag(args, "--benchmark_repetitions")) {
+        args.emplace_back("--benchmark_repetitions=" + std::to_string(ggml_repetitions));
+    }
+    if (ggml_aggregates_only && !has_flag(args, "--benchmark_report_aggregates_only")) {
+        args.emplace_back("--benchmark_report_aggregates_only=true");
+        args.emplace_back("--benchmark_display_aggregates_only=true");
+    }
+
+    std::vector<char *> argv_out;
+    argv_out.reserve(args.size());
+    for (std::string & arg : args) {
+        argv_out.push_back(arg.data());
+    }
+    int argc_out = static_cast<int>(argv_out.size());
+
+    benchmark::Initialize(&argc_out, argv_out.data());
+    if (benchmark::ReportUnrecognizedArguments(argc_out, argv_out.data())) {
+        return 1;
+    }
+
+    if (ggml_repetitions > 0) {
+        benchmark::AddCustomContext("ggml_repetitions", std::to_string(ggml_repetitions));
+    }
+    if (ggml_aggregates_only) {
+        benchmark::AddCustomContext("ggml_report_aggregates_only", "true");
+    }
+
+    benchmark::RunSpecifiedBenchmarks();
+    benchmark::Shutdown();
+    return 0;
+}

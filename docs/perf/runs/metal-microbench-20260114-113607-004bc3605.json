@@ -1,0 +1,118 @@
+{
+  "context": {
+    "date": "2026-01-14T11:36:09-08:00",
+    "host_name": "Connors-MacBook-Pro-2.local",
+    "executable": "/Users/connor/projects/llama.cpp/build/bin/ggml-metal-microbench",
+    "num_cpus": 14,
+    "mhz_per_cpu": 24,
+    "cpu_scaling_enabled": false,
+    "caches": [
+      {
+        "type": "Data",
+        "level": 1,
+        "size": 65536,
+        "num_sharing": 0
+      },
+      {
+        "type": "Instruction",
+        "level": 1,
+        "size": 131072,
+        "num_sharing": 0
+      },
+      {
+        "type": "Unified",
+        "level": 2,
+        "size": 4194304,
+        "num_sharing": 1
+      }
+    ],
+    "load_avg": [1.93799,2.54834,2.85352],
+    "library_build_type": "debug"
+  },
+  "benchmarks": [
+    {
+      "name": "BM_MulMatF16",
+      "family_index": 0,
+      "per_family_instance_index": 0,
+      "run_name": "BM_MulMatF16",
+      "run_type": "iteration",
+      "repetitions": 1,
+      "repetition_index": 0,
+      "threads": 1,
+      "iterations": 58073,
+      "real_time": 2.3247090300138301e+05,
+      "cpu_time": 1.2152721574569941e+04,
+      "time_unit": "ns"
+    },
+    {
+      "name": "BM_MulMatQ4_0",
+      "family_index": 1,
+      "per_family_instance_index": 0,
+      "run_name": "BM_MulMatQ4_0",
+      "run_type": "iteration",
+      "repetitions": 1,
+      "repetition_index": 0,
+      "threads": 1,
+      "iterations": 54176,
+      "real_time": 1.3308572829225857e+05,
+      "cpu_time": 1.2633656969875987e+04,
+      "time_unit": "ns"
+    },
+    {
+      "name": "BM_RmsNorm",
+      "family_index": 2,
+      "per_family_instance_index": 0,
+      "run_name": "BM_RmsNorm",
+      "run_type": "iteration",
+      "repetitions": 1,
+      "repetition_index": 0,
+      "threads": 1,
+      "iterations": 58925,
+      "real_time": 1.0873361547763222e+05,
+      "cpu_time": 1.1948544760288523e+04,
+      "time_unit": "ns"
+    },
+    {
+      "name": "BM_Rope",
+      "family_index": 3,
+      "per_family_instance_index": 0,
+      "run_name": "BM_Rope",
+      "run_type": "iteration",
+      "repetitions": 1,
+      "repetition_index": 0,
+      "threads": 1,
+      "iterations": 57515,
+      "real_time": 1.0730808194427789e+05,
+      "cpu_time": 1.2224984786577419e+04,
+      "time_unit": "ns"
+    },
+    {
+      "name": "BM_Softmax",
+      "family_index": 4,
+      "per_family_instance_index": 0,
+      "run_name": "BM_Softmax",
+      "run_type": "iteration",
+      "repetitions": 1,
+      "repetition_index": 0,
+      "threads": 1,
+      "iterations": 58501,
+      "real_time": 1.1014924103908391e+05,
+      "cpu_time": 1.1961453650364951e+04,
+      "time_unit": "ns"
+    },
+    {
+      "name": "BM_FlashAttn",
+      "family_index": 5,
+      "per_family_instance_index": 0,
+      "run_name": "BM_FlashAttn",
+      "run_type": "iteration",
+      "repetitions": 1,
+      "repetition_index": 0,
+      "threads": 1,
+      "iterations": 49468,
+      "real_time": 1.0975613780633532e+05,
+      "cpu_time": 1.4234131155494457e+04,
+      "time_unit": "ns"
+    }
+  ]
+}

@@ -25,7 +25,6 @@ add_executable(${TARGET}
 target_link_libraries(${TARGET} PRIVATE
     ggml
     benchmark::benchmark
-    benchmark::benchmark_main
     Threads::Threads
 )
 

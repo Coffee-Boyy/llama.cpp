@@ -33,6 +33,16 @@ If you want to skip comparison:
 python3 scripts/perf/collect_metal_microbench.py --no-compare
 ```
 
+## Noise Handling
+
+When you are looking for <2-3% improvements, take multiple repetitions and compare
+median times instead of single runs. The script can aggregate repeated runs and
+prints median deltas plus a MAD (median absolute deviation) percentage.
+
+```
+python3 scripts/perf/collect_metal_microbench.py --repetitions 7 --label "softmax unroll"
+```
+
 ## Suggested Practice
 
 - Add a short `--label` tied to the kernel change.

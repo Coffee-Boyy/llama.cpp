@@ -18,6 +18,14 @@ cmake --build build --config Release
 ./build/bin/ggml-metal-microbench
 ```
 
+### Noise control
+
+For small (<3%) deltas, use multiple repetitions and aggregates:
+
+```
+./build/bin/ggml-metal-microbench --ggml_repetitions=7 --ggml_report_aggregates_only
+```
+
 ## Tracking
 
 For tracking results over time (compute + memory notes), use:

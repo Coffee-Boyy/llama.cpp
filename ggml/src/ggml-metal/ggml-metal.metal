@@ -2089,12 +2089,16 @@ kernel void kernel_soft_max(
 
     // ALiBi
     if (args.max_bias > 0.0f) {
-        const int32_t h = i02;
+        if (tiisg == 0) {
+            const int32_t h = i02;
 
-        const float base = h < args.n_head_log2 ? args.m0 : args.m1;
-        const int   exp  = h < args.n_head_log2 ? h + 1 : 2*(h - args.n_head_log2) + 1;
+            const float base = h < args.n_head_log2 ? args.m0 : args.m1;
+            const int   exp  = h < args.n_head_log2 ? h + 1 : 2*(h - args.n_head_log2) + 1;
 
-        slope = pow(base, exp);
+            slope = pow(base, exp);
+        }
+
+        slope = simd_shuffle(slope, 0);
     }
 
     // parallel max
@@ -2194,12 +2198,16 @@ kernel void kernel_soft_max_4(
     float slope = 1.0f;
 
     if (args.max_bias > 0.0f) {
-        const int32_t h = i02;
+        if (tiisg == 0) {
+            const int32_t h = i02;
 
-        const float base = h < args.n_head_log2 ? args.m0 : args.m1;
-        const int   exp  = h < args.n_head_log2 ? h + 1 : 2*(h - args.n_head_log2) + 1;
+            const float base = h < args.n_head_log2 ? args.m0 : args.m1;
+            const int   exp  = h < args.n_head_log2 ? h + 1 : 2*(h - args.n_head_log2) + 1;
 
-        slope = pow(base, exp);
+            slope = pow(base, exp);
+        }
+
+        slope = simd_shuffle(slope, 0);
     }
 
     // parallel max
